@@ -116,6 +116,10 @@ Makes `dist/TwinCast-win32-x64/TwinCast.exe` (runs without installing) and `dist
 
 `npm run build` runs both.
 
+## Choosing what to watch
+
+Nothing plays until you choose it. Streams that are live appear in a **Live now** bar above the stage; click one to watch it. You can watch several at once, and **Stop watching** (the eye button on a stream) closes it. A sharer only sends their stream to people who are watching it, so each extra person who isn't watching costs the sharer no upload. (People on an older version of TwinCast still receive every stream automatically.)
+
 ## Joining from a browser
 
 Open the server's address (or an invite link) in any browser, enter a name and room, and join. No install needed.

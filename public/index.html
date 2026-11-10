@@ -47,10 +47,12 @@
       <div class="stage-wrap">
         <!-- Your own share, while its preview is hidden: a slim bar above the streams -->
         <div id="localBar" class="local-bar"></div>
+        <!-- Live streams you are not watching yet: click one to watch -->
+        <div id="streamBar" class="stream-bar" hidden></div>
         <div id="stage" class="stage">
           <div id="emptyStage" class="empty">
-            <p data-i18n="room.emptyTitle">Nobody is sharing yet.</p>
-            <p class="muted" data-i18n-html="room.emptyHint">Click <b>Share screen</b> to start, or wait for a friend to share.</p>
+            <p id="emptyTitle" data-i18n="room.emptyTitle">Nobody is sharing yet.</p>
+            <p id="emptyHint" class="muted" data-i18n-html="room.emptyHint">Click <b>Share screen</b> to start, or wait for a friend to share.</p>
           </div>
         </div>
         <div class="controls">

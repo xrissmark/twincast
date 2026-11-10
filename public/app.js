@@ -54,6 +54,7 @@ const VIDEO_KBPS = { start: 4000, min: 1000, max: 25000 };
 const state = {
   ws: null, myId: null, myName: '', room: '', iceServers: [], serverHttp: '',
   peers: new Map(),       // id -> peer
+  watching: new Set(),    // ids of the sharers I chose to watch
   local: null,            // { stream, label, stopAudio }
   leaving: false,
 };
@@ -229,8 +230,7 @@ function onServerMessage(msg) {
       const present = new Set(msg.peers.map((p) => p.id));
       for (const id of [...state.peers.keys()]) if (!present.has(id)) removePeer(id);
       for (const p of msg.peers) {
-        const peer = addPeer(p.id, p.name);
-        peer.client = p.client;
+        const peer = addPeer(p.id, p.name, p.client);
         peer.sharing = p.sharing;
         if (!p.sharing) removeTile(p.id); else if (peer.stream) showTile(peer);
       }
@@ -240,7 +240,7 @@ function onServerMessage(msg) {
       break;
     }
     case 'peer-joined':
-      addPeer(msg.id, msg.name).client = msg.client; renderPeople(); sysChat(tr('chat.joined', { name: msg.name }));
+      addPeer(msg.id, msg.name, msg.client); renderPeople(); sysChat(tr('chat.joined', { name: msg.name }));
       break;
     case 'peer-left': {
       const p = state.peers.get(msg.id);
@@ -266,10 +266,11 @@ function onServerMessage(msg) {
 }
 
 // ------------------------------------------------------------------ WebRTC mesh (perfect negotiation)
-function addPeer(id, name) {
+function addPeer(id, name, client) {
   if (state.peers.has(id)) return state.peers.get(id);
   const pc = new RTCPeerConnection({ iceServers: state.iceServers });
-  const peer = { id, name, pc, polite: state.myId < id, makingOffer: false, ignoreOffer: false, stream: null, sharing: null, transceivers: [] };
+  const peer = { id, name, client, pc, polite: state.myId < id, makingOffer: false, ignoreOffer: false, stream: null, sharing: null, transceivers: [],
+    wantsMine: false }; // wantsMine: they chose to watch my stream
   state.peers.set(id, peer);
 
   pc.onicecandidate = ({ candidate }) => { if (candidate) send({ type: 'signal', to: id, data: { candidate } }); };
@@ -294,13 +295,23 @@ function addPeer(id, name) {
     if (pc.iceConnectionState === 'connected') for (const t of peer.transceivers) applyVideoParams(t.sender);
     renderPeople();
   };
-  if (state.local) addLocalTracks(peer);
+  if (state.local && wantsMyStream(peer)) addLocalTracks(peer);
   return peer;
 }
 
-async function onSignal(from, { description, candidate }) {
+// Send my stream to someone only if they chose to watch it. Older versions of the app
+// don't ask (client unknown), so they get it automatically, like before.
+function wantsMyStream(peer) { return peer.wantsMine || !peer.client; }
+
+async function onSignal(from, { description, candidate, watch }) {
   const peer = state.peers.get(from);
   if (!peer) return;
+  if (typeof watch === 'boolean') { // they started / stopped watching my stream
+    peer.wantsMine = watch;
+    if (state.local && watch && !peer.transceivers.length) addLocalTracks(peer);
+    if (state.local && !watch && peer.transceivers.length) removeLocalTracks(peer);
+    return;
+  }
   const pc = peer.pc;
   try {
     if (description) {
@@ -357,6 +368,7 @@ function removeLocalTracks(peer) {
 }
 
 function removePeer(id) {
+  state.watching.delete(id);
   const p = state.peers.get(id);
   if (!p) return;
   p.pc.close();
@@ -422,7 +434,7 @@ async function startShare() {
     const c = await captureChoice(choice);
     c.stream.getVideoTracks()[0].onended = () => stopShare();
     state.local = { stream: c.stream, label: c.label, stopAudio: c.stopAudio, quality: c.quality, sourceId: c.sourceId };
-    for (const p of state.peers.values()) addLocalTracks(p);
+    for (const p of state.peers.values()) if (wantsMyStream(p)) addLocalTracks(p);
     send({ type: 'sharing', sharing: true, label: c.label, annotations: annAllowsOnShare(), app: native ? 'desktop' : 'browser' });
     showLocalTile();
     annShareStarted(c.sourceId);
@@ -460,6 +472,7 @@ async function changeShare() {
   Object.assign(l, { label: c.label, stopAudio: c.stopAudio, quality: c.quality, sourceId: c.sourceId });
   newVideo.onended = () => stopShare();
   for (const p of state.peers.values()) {
+    if (!p.transceivers.length) continue; // not watching me
     let hasAudio = false;
     for (const t of p.transceivers) {
       const kind = t.receiver.track.kind;
@@ -809,6 +822,7 @@ function tileFor(id, name, isLocal) {
       <button class="ann-btn" title="${tr('ann.drawTitle')}" hidden><span class="ico">${svgIcon('pencil')}</span><span class="lbl">${tr('ann.annotate')}</span></button>
       <button class="stats-btn" title="${tr('tile.statsTitle')}">${tr('tile.stats')}</button>
       <button class="focus-btn" title="${tr('tile.focus')}">${tr('tile.focus')}</button>
+      ${isLocal ? '' : `<button class="unwatch-btn" title="${tr('watch.stop')}"><span class="ico">${svgIcon('eyeOff')}</span></button>`}
       <button class="fs-btn" title="${tr('tile.fullscreen')}">⛶</button>
     </div>`;
   tile.querySelector('.who').textContent = isLocal ? tr('tile.you', { label: name }) : name;
@@ -828,6 +842,7 @@ function tileFor(id, name, isLocal) {
   };
   tile.querySelector('.fs-btn').onclick =() => (document.fullscreenElement ? document.exitFullscreen() : tile.requestFullscreen());
   tile.querySelector('.focus-btn').onclick = () => toggleFocus(tile);
+  if (!isLocal) tile.querySelector('.unwatch-btn').onclick = () => setWatch(id, false);
   video.ondblclick = () => (document.fullscreenElement ? document.exitFullscreen() : tile.requestFullscreen());
   $('stage').appendChild(tile);
   updateEmpty();
@@ -849,7 +864,7 @@ function playVideo(tile, stream) {
 }
 
 function showTile(peer) {
-  if (!peer.stream || !peer.sharing) return;
+  if (!peer.stream || !peer.sharing || !state.watching.has(peer.id)) return;
   const tile = tileFor(peer.id, peer.name, false);
   tile.querySelector('.who').textContent = peer.sharing.label ? `${peer.name} — ${peer.sharing.label}` : peer.name;
   playVideo(tile, peer.stream);
@@ -939,7 +954,49 @@ let lastStageSize = '';
 setInterval(() => { const st = $('stage'); const k = st.clientWidth + 'x' + st.clientHeight; if (k !== lastStageSize) { lastStageSize = k; queueLayout(); } }, 1000);
 new MutationObserver(queueLayout).observe($('stage'), { childList: true, attributes: true, attributeFilter: ['class'] });
 
-function updateEmpty() { $('emptyStage').hidden = !!document.querySelector('.tile'); }
+// ------------------------------------------------------------------ choosing what to watch
+// Live streams I'm not watching are listed in a bar above the stage; click to watch.
+function setWatch(id, on) {
+  const p = state.peers.get(id);
+  if (on) state.watching.add(id); else state.watching.delete(id);
+  send({ type: 'signal', to: id, data: { watch: on } }); // the sharer sends only to watchers
+  if (on) { if (p && p.stream) showTile(p); } else removeTile(id);
+  renderStreamBar();
+}
+
+function renderStreamBar() {
+  const bar = $('streamBar');
+  const live = [...state.peers.values()].filter((p) => p.sharing && !state.watching.has(p.id));
+  bar.innerHTML = '';
+  if (live.length) {
+    const label = document.createElement('span');
+    label.className = 'stream-bar-label';
+    label.textContent = tr('watch.liveNow');
+    bar.appendChild(label);
+  }
+  for (const p of live) {
+    const b = document.createElement('button');
+    b.className = 'stream-chip';
+    b.title = tr('watch.watch');
+    b.innerHTML = '<span class="live-dot"></span><span class="chip-name"></span><span class="chip-action"><span class="ico"></span><span></span></span>';
+    b.querySelector('.chip-name').textContent = p.sharing.label ? `${p.name} — ${p.sharing.label}` : p.name;
+    b.querySelector('.chip-action .ico').innerHTML = svgIcon('eye');
+    b.querySelector('.chip-action span:last-child').textContent = tr('watch.watch');
+    b.onclick = () => setWatch(p.id, true);
+    bar.appendChild(b);
+  }
+  bar.hidden = !live.length;
+  updateEmpty();
+}
+
+function updateEmpty() {
+  const hasTile = !!$('stage').querySelector('.tile');
+  $('emptyStage').hidden = hasTile;
+  if (hasTile) return;
+  const choosable = [...state.peers.values()].some((p) => p.sharing);
+  $('emptyTitle').textContent = tr(choosable ? 'room.pickTitle' : 'room.emptyTitle');
+  $('emptyHint').innerHTML = tr(choosable ? 'room.pickHint' : 'room.emptyHint');
+}
 
 // ------------------------------------------------------------------ quality stats
 function statsOn() { return load('ss.stats') !== '0'; }
@@ -987,6 +1044,7 @@ async function updateStats() {
   if (mine && state.local) {
     const lines = [];
     for (const peer of state.peers.values()) {
+      if (!peer.transceivers.length) continue; // not watching
       const stats = await peer.pc.getStats();
       let o = null;
       stats.forEach((s) => { if (s.type === 'outbound-rtp' && s.kind === 'video' && s.bytesSent > 0) o = s; });
@@ -1019,6 +1077,7 @@ function renderPeople() {
     rows.push(`<li>${clientIcon(p.client, ice === 'failed')}${esc(p.name)}${p.sharing ? `<span class="tag">${tr('room.live')}</span>` : conn ? `<span class="state">${esc(conn)}</span>` : ''}</li>`);
   }
   ul.innerHTML = rows.join('');
+  renderStreamBar();
   $('peopleCount').textContent = state.peers.size + 1;
 }
 
