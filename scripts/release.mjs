@@ -5,8 +5,8 @@
 // Steps:
 //   1. checks: clean git tree, version not released yet, you are logged in with `gh`
 //   2. builds the server package and the Windows installer
-//   3. uploads installer + latest.yml + blockmap (electron-builder) as release v<version>
-//   4. attaches the server zip to the same release
+//   3. creates GitHub Release v<version> with installer + latest.yml + blockmap (via gh)
+//      (the server zip is attached to the same release)
 //
 // Before running: raise "version" in package.json (and server/package.json), commit, push.
 import fs from 'node:fs';
@@ -36,17 +36,29 @@ let exists = false;
 try { gh(['release', 'view', tag, '--repo', `${GITHUB.owner}/${GITHUB.repo}`], { stdio: ['ignore', 'pipe', 'ignore'] }); exists = true; } catch {}
 if (exists) throw new Error(`${tag} is already released. Raise "version" in package.json first.`);
 try { run('git', ['ls-remote', '--exit-code', 'origin', 'HEAD']); } catch { throw new Error('Push your code to GitHub first (git push -u origin main).'); }
+let upstream = '';
+try { upstream = run('git', ['rev-parse', '@{u}']); } catch {}
+if (upstream !== run('git', ['rev-parse', 'HEAD'])) throw new Error('Your latest commit is not on GitHub yet: run git push first.');
 console.log(`Releasing TwinCast ${tag} to github.com/${GITHUB.owner}/${GITHUB.repo}`);
 
 // 2) server package
 execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'build-server.mjs')], { cwd: ROOT, stdio: 'inherit' });
 
-// 3) installer + upload (electron-builder creates the release and tag v<version>)
-process.env.GH_TOKEN = token;
-await buildApp({ publish: 'always' });
+// 3) installer (built locally; uploaded with gh below - more reliable than the builder's uploader)
+await buildApp({ publish: 'never' });
 
-// 4) attach the server package
-const serverZip = path.join(ROOT, 'dist', `twincast-server-${JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version}.zip`);
-if (fs.existsSync(serverZip)) gh(['release', 'upload', tag, serverZip, '--clobber', '--repo', `${GITHUB.owner}/${GITHUB.repo}`], { stdio: 'inherit' });
+// 4) create the release with everything the updater needs, plus the server package
+const dist = path.join(ROOT, 'dist');
+const serverVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version;
+const files = [
+  `TwinCast-Setup-${pkg.version}.exe`,
+  `TwinCast-Setup-${pkg.version}.exe.blockmap`,
+  'latest.yml', // tells installed apps about this version - must be in every release
+  `twincast-server-${serverVersion}.zip`,
+].map((f) => path.join(dist, f));
+for (const f of files) if (!fs.existsSync(f)) throw new Error('Missing build output: ' + f);
+gh(['release', 'create', tag, ...files, '--repo', `${GITHUB.owner}/${GITHUB.repo}`, '--target', run('git', ['rev-parse', 'HEAD']),
+  '--title', `TwinCast ${pkg.version}`, '--notes', `Install: download **TwinCast-Setup-${pkg.version}.exe** and run it. Installed apps update automatically.\n\nServer: \`twincast-server-${serverVersion}.zip\`.`],
+  { stdio: 'inherit' });
 
 console.log(`\nReleased: https://github.com/${GITHUB.owner}/${GITHUB.repo}/releases/tag/${tag}`);
