@@ -18,7 +18,7 @@ import { buildApp, GITHUB } from './build-app.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const tag = `v${pkg.version}`;
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts }).trim();
+const run = (cmd, args, opts = {}) => (execFileSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts }) || '').trim(); // '' when output goes to the screen
 
 function gh(args, opts) {
   const candidates = ['gh', path.join(process.env.ProgramFiles || 'C:/Program Files', 'GitHub CLI', 'gh.exe')];
