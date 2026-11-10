@@ -47,8 +47,6 @@
       <div class="stage-wrap">
         <!-- Your own share, while its preview is hidden: a slim bar above the streams -->
         <div id="localBar" class="local-bar"></div>
-        <!-- Live streams you are not watching yet: click one to watch -->
-        <div id="streamBar" class="stream-bar" hidden></div>
         <div id="stage" class="stage">
           <div id="emptyStage" class="empty">
             <p id="emptyTitle" data-i18n="room.emptyTitle">Nobody is sharing yet.</p>
@@ -74,13 +72,23 @@
       </div>
 
       <aside class="sidebar">
-        <h3><span data-i18n="room.people">People</span> <span id="peopleCount" class="badge">1</span></h3>
-        <ul id="peopleList" class="people"></ul>
-        <h3 data-i18n="room.chat">Chat</h3>
-        <div id="chatLog" class="chat-log"></div>
-        <form id="chatForm" class="chat-form">
-          <input id="chatInput" maxlength="500" data-i18n-placeholder="room.chatPlaceholder" placeholder="Say something…" autocomplete="off">
-        </form>
+        <div class="side-tabs" role="tablist">
+          <button type="button" class="side-tab active" data-side="people" role="tab"><span data-i18n="room.people">People</span> <span id="peopleCount" class="badge">1</span></button>
+          <button type="button" class="side-tab" data-side="chat" role="tab"><span data-i18n="room.chat">Chat</span> <span id="chatUnread" class="badge unread" hidden>0</span></button>
+        </div>
+        <div id="sidePeople" class="side-panel">
+          <h4 class="people-head"><span data-i18n="people.streaming">Streaming</span> <span id="streamingCount" class="badge">0</span></h4>
+          <ul id="streamingList" class="people"></ul>
+          <p id="noStreamers" class="muted small people-empty" data-i18n="people.noneStreaming">Nobody is streaming</p>
+          <h4 class="people-head"><span data-i18n="people.online">Online</span> <span id="onlineCount" class="badge">1</span></h4>
+          <ul id="peopleList" class="people"></ul>
+        </div>
+        <div id="sideChat" class="side-panel" hidden>
+          <div id="chatLog" class="chat-log"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" maxlength="500" data-i18n-placeholder="room.chatPlaceholder" placeholder="Say something…" autocomplete="off">
+          </form>
+        </div>
       </aside>
     </section>
   </main>

@@ -118,7 +118,14 @@ Makes `dist/TwinCast-win32-x64/TwinCast.exe` (runs without installing) and `dist
 
 ## Choosing what to watch
 
-Nothing plays until you choose it. Streams that are live appear in a **Live now** bar above the stage; click one to watch it. You can watch several at once, and **Stop watching** (the eye button on a stream) closes it. A sharer only sends their stream to people who are watching it, so each extra person who isn't watching costs the sharer no upload. (People on an older version of TwinCast still receive every stream automatically.)
+The sidebar has two tabs: **People** and **Chat** (a red badge counts new messages while you're on People).
+
+People is split into **Streaming** and **Online**. Nothing plays until you choose it: click someone under **Streaming** to watch them, and click again to stop. You can watch several at once.
+
+* A white **eye** left of a name means you are watching that person.
+* While you share, a white **screen** icon left of a name means that person is watching you.
+
+A sharer only sends their stream to people who are watching it, so someone who isn't watching costs the sharer no upload. (People on an older version of TwinCast still receive every stream automatically.)
 
 ## Joining from a browser
 

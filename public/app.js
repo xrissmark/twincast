@@ -23,6 +23,7 @@ const ICON_PATHS = {
   change: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  watcher: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10 7 5 3-5 3z"/>',
   eyeOff: '<path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.2 3.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   pencil: '<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
   broom: '<path d="M10 2.5h4v6.5h-4z"/><path d="M5 12a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v1H5z"/><path d="M5 13l-1 8h16l-1-8"/><path d="M9 17v4M12 16v5M15 17v4"/>',
@@ -310,6 +311,7 @@ async function onSignal(from, { description, candidate, watch }) {
     peer.wantsMine = watch;
     if (state.local && watch && !peer.transceivers.length) addLocalTracks(peer);
     if (state.local && !watch && peer.transceivers.length) removeLocalTracks(peer);
+    renderPeople();
     return;
   }
   const pc = peer.pc;
@@ -955,38 +957,13 @@ setInterval(() => { const st = $('stage'); const k = st.clientWidth + 'x' + st.c
 new MutationObserver(queueLayout).observe($('stage'), { childList: true, attributes: true, attributeFilter: ['class'] });
 
 // ------------------------------------------------------------------ choosing what to watch
-// Live streams I'm not watching are listed in a bar above the stage; click to watch.
+// Click a streamer in the People tab to watch them (several at once is fine).
 function setWatch(id, on) {
   const p = state.peers.get(id);
   if (on) state.watching.add(id); else state.watching.delete(id);
   send({ type: 'signal', to: id, data: { watch: on } }); // the sharer sends only to watchers
   if (on) { if (p && p.stream) showTile(p); } else removeTile(id);
-  renderStreamBar();
-}
-
-function renderStreamBar() {
-  const bar = $('streamBar');
-  const live = [...state.peers.values()].filter((p) => p.sharing && !state.watching.has(p.id));
-  bar.innerHTML = '';
-  if (live.length) {
-    const label = document.createElement('span');
-    label.className = 'stream-bar-label';
-    label.textContent = tr('watch.liveNow');
-    bar.appendChild(label);
-  }
-  for (const p of live) {
-    const b = document.createElement('button');
-    b.className = 'stream-chip';
-    b.title = tr('watch.watch');
-    b.innerHTML = '<span class="live-dot"></span><span class="chip-name"></span><span class="chip-action"><span class="ico"></span><span></span></span>';
-    b.querySelector('.chip-name').textContent = p.sharing.label ? `${p.name} — ${p.sharing.label}` : p.name;
-    b.querySelector('.chip-action .ico').innerHTML = svgIcon('eye');
-    b.querySelector('.chip-action span:last-child').textContent = tr('watch.watch');
-    b.onclick = () => setWatch(p.id, true);
-    bar.appendChild(b);
-  }
-  bar.hidden = !live.length;
-  updateEmpty();
+  renderPeople();
 }
 
 function updateEmpty() {
@@ -1068,20 +1045,72 @@ function clientIcon(type, failed) {
   return `<span class="client ${kind}${failed ? ' failed' : ''}" title="${title}" role="img" aria-label="${title}">${svgIcon(kind)}</span>`;
 }
 
-function renderPeople() {
-  const ul = $('peopleList');
-  const rows = [`<li>${clientIcon(CLIENT_TYPE)}<b>${esc(state.myName)}</b>&nbsp;${esc(tr('room.you'))}${state.local ? `<span class="tag">${tr('room.live')}</span>` : ''}</li>`];
-  for (const p of state.peers.values()) {
-    const ice = p.pc.iceConnectionState;
-    const conn = ice === 'connected' || ice === 'completed' ? '' : ice === 'failed' ? tr('client.cantConnect') : (ice === 'new' ? '' : ice);
-    rows.push(`<li>${clientIcon(p.client, ice === 'failed')}${esc(p.name)}${p.sharing ? `<span class="tag">${tr('room.live')}</span>` : conn ? `<span class="state">${esc(conn)}</span>` : ''}</li>`);
-  }
-  ul.innerHTML = rows.join('');
-  renderStreamBar();
-  $('peopleCount').textContent = state.peers.size + 1;
+// People tab: "Streaming" (click to watch / stop) and "Online".
+// Left of the name: device icon, then white status icons:
+//   eye    = you are watching this streamer
+//   screen = this person is watching your stream
+function personRow(p, isMe) {
+  const ice = isMe ? 'connected' : p.pc.iceConnectionState;
+  const failed = ice === 'failed';
+  const conn = ice === 'connected' || ice === 'completed' || ice === 'new' ? '' : failed ? tr('client.cantConnect') : ice;
+  const status = [];
+  if (!isMe && p.sharing && state.watching.has(p.id)) status.push(`<span class="status-ico" title="${esc(tr('people.youWatch'))}">${svgIcon('eye')}</span>`);
+  if (!isMe && state.local && p.transceivers.length) status.push(`<span class="status-ico" title="${esc(tr('people.watchingYou'))}">${svgIcon('watcher')}</span>`);
+  const streamer = !isMe && !!p.sharing;
+  const watching = streamer && state.watching.has(p.id);
+  const action = streamer ? `<span class="row-action">${esc(tr(watching ? 'watch.stop' : 'watch.watch'))}</span>` : '';
+  const title = streamer ? ` title="${esc(tr(watching ? 'people.clickStop' : 'people.clickWatch'))}${p.sharing.label ? ' · ' + esc(p.sharing.label) : ''}"` : '';
+  return `<li class="person${streamer ? ' streamer' : ''}${watching ? ' watching' : ''}"${streamer ? ` data-id="${p.id}" role="button" tabindex="0"` : ''}${title}>` +
+    `${clientIcon(isMe ? CLIENT_TYPE : p.client, failed)}${status.join('')}` +
+    `<span class="person-name">${isMe ? `<b>${esc(state.myName)}</b> ${esc(tr('room.you'))}` : esc(p.name)}</span>` +
+    `${conn ? `<span class="state">${esc(conn)}</span>` : action}</li>`;
 }
 
-function addChat(name, text) {
+function renderPeople() {
+  const others = [...state.peers.values()];
+  const me = { sharing: state.local };
+  const streaming = others.filter((p) => p.sharing);
+  const online = others.filter((p) => !p.sharing);
+  $('streamingList').innerHTML = (state.local ? personRow(me, true) : '') + streaming.map((p) => personRow(p, false)).join('');
+  $('peopleList').innerHTML = (state.local ? '' : personRow(me, true)) + online.map((p) => personRow(p, false)).join('');
+  const nStreaming = streaming.length + (state.local ? 1 : 0);
+  $('streamingCount').textContent = nStreaming;
+  $('onlineCount').textContent = online.length + (state.local ? 0 : 1);
+  $('noStreamers').hidden = nStreaming > 0;
+  $('peopleCount').textContent = state.peers.size + 1;
+  updateEmpty();
+}
+// Click (or Enter/Space) on a streamer: watch / stop watching.
+$('streamingList').onclick = (e) => {
+  const li = e.target.closest('li.streamer');
+  if (li) setWatch(li.dataset.id, !state.watching.has(li.dataset.id));
+};
+$('streamingList').onkeydown = (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('li.streamer')) { e.preventDefault(); e.target.click(); }
+};
+
+// People / Chat tabs; Chat shows how many messages arrived while you were on People.
+let chatUnread = 0;
+function showSide(name) {
+  document.querySelectorAll('.side-tab').forEach((t) => t.classList.toggle('active', t.dataset.side === name));
+  $('sidePeople').hidden = name !== 'people';
+  $('sideChat').hidden = name !== 'chat';
+  if (name === 'chat') {
+    chatUnread = 0; $('chatUnread').hidden = true;
+    $('chatLog').scrollTop = $('chatLog').scrollHeight;
+    $('chatInput').focus();
+  }
+}
+document.querySelectorAll('.side-tab').forEach((t) => { t.onclick = () => showSide(t.dataset.side); });
+function noteUnread() {
+  if (!$('sideChat').hidden) return;
+  chatUnread++;
+  $('chatUnread').textContent = chatUnread > 99 ? '99+' : String(chatUnread);
+  $('chatUnread').hidden = false;
+}
+
+function addChat(name, text, mine = false) {
+  if (!mine) noteUnread();
   const log = $('chatLog');
   const d = document.createElement('div'); d.className = 'msg';
   d.innerHTML = `<b>${esc(name)}</b> ${esc(text)}`;
@@ -1114,6 +1143,7 @@ function leave() {
   resetRoom();
   if (state.ws) state.ws.close();
   $('chatLog').innerHTML = '';
+  showSide('people'); chatUnread = 0; $('chatUnread').hidden = true;
   $('room').hidden = true; $('join').hidden = false;
   document.title = 'TwinCast';
 }
@@ -1136,7 +1166,7 @@ $('chatForm').onsubmit = (e) => {
   e.preventDefault();
   const text = $('chatInput').value.trim();
   if (!text) return;
-  send({ type: 'chat', text }); addChat(state.myName, text); $('chatInput').value = '';
+  send({ type: 'chat', text }); addChat(state.myName, text, true); $('chatInput').value = '';
 };
 window.addEventListener('pagehide', () => { send({ type: 'leave' }); state.leaving = true; });
 
