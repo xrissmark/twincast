@@ -67,7 +67,7 @@ npm install
 npm run app
 ```
 
-(or double-click **Start TwinCast.bat**)
+(or double-click **Start TwinCast.bat**; friends use the installer, see Building)
 
 1. Type the server address (for example `https://twincast.example.com` or `http://[2804:…]:8080`) and click **Test connection**. It checks that the address is a TwinCast server and that rooms can connect, and shows the response time.
 2. Enter your name and a room (for example `game-night`), then click **Join room**.
@@ -112,9 +112,29 @@ Makes `dist/twincast-server/` and `dist/twincast-server-<version>.zip` (about 12
 npm run build:app
 ```
 
-Makes `dist/TwinCast-win32-x64/TwinCast.exe` (runs without installing) and `dist/TwinCast-<version>-win-x64.zip` (about 150 MB) to send to friends. It includes the audio helper, and builds it first if `bin/apploopback.exe` is missing. Windows only.
+Makes the Windows installer `dist/TwinCast-Setup-<version>.exe` (about 115 MB) to send to friends. It installs per user (no admin rights), adds Start menu and desktop shortcuts, and includes the audio helper (built first if `bin/apploopback.exe` is missing). `dist/win-unpacked/TwinCast.exe` runs without installing, for testing. Windows only.
 
 `npm run build` runs both.
+
+## Updates (GitHub Releases)
+
+The installed app checks the latest release of [xrissmark/twincast](https://github.com/xrissmark/twincast/releases) a few seconds after it starts and every 4 hours. A newer version downloads in the background; then a banner offers **Restart to update** (the share stops, the update installs silently and TwinCast reopens). **Later** hides it, and the update installs the next time TwinCast is closed. Settings are kept. Running from source (`npm run app`) never updates.
+
+To publish a new version:
+
+1. Raise `"version"` in `package.json` (and in `server/package.json` if the server changed), e.g. `2.0.0` → `2.1.0`.
+2. Commit and push.
+3. Run:
+
+   ```bash
+   npm run release
+   ```
+
+   It checks that everything is committed and the version is new, builds the server package and the installer, and publishes them as GitHub Release `v<version>` (using your `gh` login). Friends' apps pick it up within a few hours, or on their next start.
+
+The app isn't code-signed, so Windows SmartScreen may warn the first time someone runs the installer ("More info" → "Run anyway"). Updates after that install without prompts.
+
+For testing an update locally, start an installed TwinCast with `TWINCAST_UPDATE_URL` set to a web folder containing a newer `latest.yml`, installer and `.blockmap` from `dist`.
 
 ## Choosing what to watch
 

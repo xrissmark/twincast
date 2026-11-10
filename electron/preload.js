@@ -22,4 +22,8 @@ contextBridge.exposeInMainWorld('desktop', {
   overlaySend: (msg) => ipcRenderer.send('overlay-send', msg),
   overlayClose: () => ipcRenderer.invoke('overlay-close'),
   onOverlayMsg: (cb) => listen('overlay-msg', cb),
+  // App version + automatic updates
+  appInfo: () => ipcRenderer.invoke('app-info'),
+  onUpdateStatus: (cb) => listen('update-status', cb),
+  installUpdate: () => ipcRenderer.invoke('update-install'),
 });

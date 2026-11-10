@@ -29,6 +29,10 @@ const I18N = (() => {
       'test.viaIPv6': ' over IPv6',
       'test.viaIPv4': ' over IPv4',
 
+      'update.ready': "TwinCast {version} is ready to install.",
+      'update.restart': "Restart to update",
+      'update.later': "Later",
+      'update.laterHint': "The update will install the next time you close TwinCast.",
       'conn.lost': 'Connection to server lost. Reconnecting…',
       'conn.back': 'Reconnected.',
 
@@ -195,6 +199,10 @@ const I18N = (() => {
       'test.viaIPv6': ' via IPv6',
       'test.viaIPv4': ' via IPv4',
 
+      'update.ready': "O TwinCast {version} está pronto para instalar.",
+      'update.restart': "Reiniciar e atualizar",
+      'update.later': "Depois",
+      'update.laterHint': "A atualização será instalada na próxima vez que você fechar o TwinCast.",
       'conn.lost': 'Conexão com o servidor perdida. Reconectando…',
       'conn.back': 'Reconectado.',
 
@@ -361,6 +369,10 @@ const I18N = (() => {
       'test.viaIPv6': ' por IPv6',
       'test.viaIPv4': ' por IPv4',
 
+      'update.ready': "TwinCast {version} está listo para instalarse.",
+      'update.restart': "Reiniciar y actualizar",
+      'update.later': "Más tarde",
+      'update.laterHint': "La actualización se instalará la próxima vez que cierres TwinCast.",
       'conn.lost': 'Se perdió la conexión con el servidor. Reconectando…',
       'conn.back': 'Reconectado.',
 

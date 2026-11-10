@@ -39,6 +39,7 @@ const ICON_PATHS = {
   join: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>',
   live: '<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
   test: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
 };
 const svgIcon = (name) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 const CLIENT_INFO = {
@@ -1176,3 +1177,33 @@ if (browserShareProblem()) {
   $('shareBtn').querySelector('.lbl').textContent = window.isSecureContext ? tr('share.btnUnsupported') : tr('share.btnNeedsHttps');
 }
 initJoin();
+
+// ------------------------------------------------------------------ app version + updates (desktop app)
+// Downloads happen in the background; when ready, a banner offers "Restart to update".
+// "Later" hides it; the update then installs the next time TwinCast is closed.
+let updateDismissed = null;
+function showUpdate(st) {
+  const ready = st && st.state === 'ready' && updateDismissed !== st.version;
+  $('updateBanner').hidden = !ready;
+  if (ready) $('updateText').textContent = tr('update.ready', { version: st.version });
+}
+if (native && native.appInfo) {
+  native.appInfo().then((info) => {
+    if (!info) return;
+    $('appVersion').textContent = 'TwinCast v' + info.version;
+    $('appVersion').hidden = false;
+    showUpdate(info.update);
+  }).catch(() => {});
+  native.onUpdateStatus(showUpdate);
+  $('updateRestart').onclick = () => {
+    $('updateRestart').disabled = true;
+    if (state.local) stopShare();
+    send({ type: 'leave' }); state.leaving = true;
+    native.installUpdate();
+  };
+  $('updateLater').onclick = () => {
+    updateDismissed = ($('updateText').textContent.match(/\d+\.\d+\.\d+\S*/) || [null])[0];
+    $('updateBanner').hidden = true;
+    toast(tr('update.laterHint'), 4000);
+  };
+}

@@ -1,0 +1,52 @@
+// npm run release
+// Publishes the current version (package.json "version") as a GitHub Release on
+// xrissmark/twincast. Installed apps pick it up within a few hours (or on next start).
+//
+// Steps:
+//   1. checks: clean git tree, version not released yet, you are logged in with `gh`
+//   2. builds the server package and the Windows installer
+//   3. uploads installer + latest.yml + blockmap (electron-builder) as release v<version>
+//   4. attaches the server zip to the same release
+//
+// Before running: raise "version" in package.json (and server/package.json), commit, push.
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { buildApp, GITHUB } from './build-app.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const tag = `v${pkg.version}`;
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts }).trim();
+
+function gh(args, opts) {
+  const candidates = ['gh', path.join(process.env.ProgramFiles || 'C:/Program Files', 'GitHub CLI', 'gh.exe')];
+  for (const c of candidates) {
+    try { return run(c, args, opts); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  }
+  throw new Error('GitHub CLI (gh) not found. Install it: winget install GitHub.cli');
+}
+
+// 1) checks
+if (run('git', ['status', '--porcelain'])) throw new Error('Uncommitted changes: commit them before releasing.');
+const token = gh(['auth', 'token']);
+if (!token) throw new Error('Not logged in to GitHub: run gh auth login');
+let exists = false;
+try { gh(['release', 'view', tag, '--repo', `${GITHUB.owner}/${GITHUB.repo}`], { stdio: ['ignore', 'pipe', 'ignore'] }); exists = true; } catch {}
+if (exists) throw new Error(`${tag} is already released. Raise "version" in package.json first.`);
+try { run('git', ['ls-remote', '--exit-code', 'origin', 'HEAD']); } catch { throw new Error('Push your code to GitHub first (git push -u origin main).'); }
+console.log(`Releasing TwinCast ${tag} to github.com/${GITHUB.owner}/${GITHUB.repo}`);
+
+// 2) server package
+execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'build-server.mjs')], { cwd: ROOT, stdio: 'inherit' });
+
+// 3) installer + upload (electron-builder creates the release and tag v<version>)
+process.env.GH_TOKEN = token;
+await buildApp({ publish: 'always' });
+
+// 4) attach the server package
+const serverZip = path.join(ROOT, 'dist', `twincast-server-${JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version}.zip`);
+if (fs.existsSync(serverZip)) gh(['release', 'upload', tag, serverZip, '--clobber', '--repo', `${GITHUB.owner}/${GITHUB.repo}`], { stdio: 'inherit' });
+
+console.log(`\nReleased: https://github.com/${GITHUB.owner}/${GITHUB.repo}/releases/tag/${tag}`);

@@ -2,6 +2,7 @@
 //  - a window/screen picker (desktopCapturer)
 //  - per-application audio capture via bin/apploopback.exe (window's app, all, all but Discord, or picked apps)
 //  - a transparent overlay that shows viewers' marks on the sharer's real screen
+//  - automatic updates from GitHub Releases (electron-updater)
 //  It connects to a separate TwinCast server (see server/).
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, protocol, net, shell, screen } = require('electron');
 const os = require('os');
@@ -228,7 +229,51 @@ app.whenReady().then(() => {
     if (fromApp(e) && e.sender === (win && win.webContents) && overlay && !overlay.isDestroyed()) overlay.webContents.send('overlay-msg', msg);
   });
 
+  ipcMain.handle('app-info', (e) => (fromApp(e) ? { version: app.getVersion(), update: updateStatus } : null));
+  ipcMain.handle('update-install', (e) => { if (fromApp(e)) installUpdate(); });
+
   createWindow();
+  setupUpdates();
 });
+
+// ---- Updates ---------------------------------------------------------------------------
+// The installed app checks GitHub Releases (xrissmark/twincast) on start and every 4 hours,
+// downloads a newer version in the background, then the page offers "Restart to update".
+// If the user doesn't restart, it installs the next time they close the app.
+// TWINCAST_UPDATE_URL=<folder url> points it at a plain web folder instead (for testing).
+let updater = null;
+let updateStatus = null;
+function tellUpdate(status) {
+  updateStatus = status;
+  if (win && !win.isDestroyed()) win.webContents.send('update-status', status);
+}
+function setupUpdates() {
+  const testUrl = process.env.TWINCAST_UPDATE_URL;
+  if (!app.isPackaged && !testUrl) return; // running from source: nothing to update
+  let autoUpdater;
+  try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
+  updater = autoUpdater;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = null;
+  if (testUrl) autoUpdater.setFeedURL({ provider: 'generic', url: testUrl });
+  let version = null;
+  autoUpdater.on('update-available', (info) => { version = info.version; tellUpdate({ state: 'downloading', version, percent: 0 }); });
+  autoUpdater.on('download-progress', (p) => tellUpdate({ state: 'downloading', version, percent: Math.round(p.percent || 0) }));
+  autoUpdater.on('update-downloaded', (info) => tellUpdate({ state: 'ready', version: info.version }));
+  autoUpdater.on('error', (err) => {
+    console.warn('update check failed:', err && err.message);
+    if (updateStatus && updateStatus.state === 'downloading') tellUpdate(null); // try again next check
+  });
+  const check = () => { if (!updateStatus || updateStatus.state !== 'ready') autoUpdater.checkForUpdates().catch(() => {}); };
+  setTimeout(check, 5000);
+  setInterval(check, 4 * 3600e3).unref();
+}
+function installUpdate() {
+  if (!updater || !updateStatus || updateStatus.state !== 'ready') return;
+  stopAudio(); closeOverlay();
+  // silent install, then start TwinCast again
+  setImmediate(() => updater.quitAndInstall(true, true));
+}
 
 app.on('window-all-closed', () => { stopAudio(); closeOverlay(); app.quit(); });

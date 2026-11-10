@@ -240,3 +240,15 @@ button:has(> .ico) { display: inline-flex; align-items: center; justify-content:
 .person .row-action { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--accent2); opacity: 0; transition: opacity .12s; white-space: nowrap; }
 .person.streamer:hover .row-action, .person.streamer:focus-visible .row-action { opacity: 1; }
 #sideChat .chat-log { flex: 1; }
+
+/* update ready banner (desktop app) */
+.update-banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100% - 24px); padding: 8px 8px 8px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.45); }
+.update-banner[hidden] { display: none; }
+.update-banner > .ico { color: var(--accent2); }
+.update-banner > .ico svg { width: 18px; height: 18px; }
+.update-banner #updateText { font-weight: 600; }
+.update-banner button { padding: 6px 12px; }
+.app-version { text-align: center; margin: 10px 0 0; }
+.app-version[hidden] { display: none; }

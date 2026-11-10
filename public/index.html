@@ -30,6 +30,7 @@
       </div>
       <button type="submit" class="primary"><span class="ico" data-icon="join"></span><span data-i18n="join.submit">Join room</span></button>
       <p id="joinError" class="error"></p>
+      <p id="appVersion" class="app-version muted small" hidden></p>
     </form>
   </main>
 
@@ -185,6 +186,14 @@
       </div>
     </form>
   </dialog>
+
+  <!-- Desktop app: a downloaded update is ready -->
+  <div id="updateBanner" class="update-banner" role="status" hidden>
+    <span class="ico" data-icon="download"></span>
+    <span id="updateText"></span>
+    <button type="button" id="updateRestart" class="primary"><span class="ico" data-icon="change"></span><span data-i18n="update.restart">Restart to update</span></button>
+    <button type="button" id="updateLater" class="ghost" data-i18n="update.later" data-i18n-title="update.laterHint">Later</button>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
   <script src="i18n.js"></script>
