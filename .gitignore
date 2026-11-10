@@ -7,8 +7,10 @@ dist/
 
 # Secrets / local data
 server/admin-password.txt
-.claude/settings.local.json
 
 # Misc
 *.log
 *.obj
+
+# Claude Code local settings
+.claude/
