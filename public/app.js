@@ -246,7 +246,10 @@ function onServerMessage(msg) {
       break;
     case 'peer-left': {
       const p = state.peers.get(msg.id);
-      if (p) { sysChat(tr('chat.left', { name: p.name })); removePeer(msg.id); renderPeople(); }
+      if (p) {
+        if (state.local && p.wantsMine) playCue('unwatch'); // a watcher left the room
+        sysChat(tr('chat.left', { name: p.name })); removePeer(msg.id); renderPeople();
+      }
       break;
     }
     case 'peer-sharing': {
@@ -309,6 +312,7 @@ async function onSignal(from, { description, candidate, watch }) {
   const peer = state.peers.get(from);
   if (!peer) return;
   if (typeof watch === 'boolean') { // they started / stopped watching my stream
+    if (state.local && watch !== peer.wantsMine) playCue(watch ? 'watch' : 'unwatch');
     peer.wantsMine = watch;
     if (state.local && watch && !peer.transceivers.length) addLocalTracks(peer);
     if (state.local && !watch && peer.transceivers.length) removeLocalTracks(peer);
@@ -368,6 +372,35 @@ function removeLocalTracks(peer) {
     try { t.direction = 'inactive'; } catch {}
   }
   peer.transceivers = [];
+}
+
+// Little sounds for the person sharing: a rising "ta-da" when someone starts watching
+// your stream, the same notes falling when they stop watching (or leave the room).
+let cueCtx = null;
+function playCue(kind) {
+  try {
+    cueCtx = cueCtx || new AudioContext();
+    if (cueCtx.state === 'suspended') cueCtx.resume();
+    const t0 = cueCtx.currentTime + 0.02;
+    // [frequency Hz, start s, length s]: G5 -> C6 (+E6 sparkle) up, or the reverse down
+    const notes = kind === 'watch'
+      ? [[784, 0, 0.16], [1047, 0.12, 0.5], [1319, 0.12, 0.5]]
+      : [[1047, 0, 0.16], [784, 0.12, 0.45], [659, 0.12, 0.45]];
+    const out = cueCtx.createGain();
+    out.gain.value = 0.18;
+    out.connect(cueCtx.destination);
+    for (const [freq, start, len] of notes) {
+      const osc = cueCtx.createOscillator(), env = cueCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(0, t0 + start);
+      env.gain.linearRampToValueAtTime(1, t0 + start + 0.012);
+      env.gain.exponentialRampToValueAtTime(0.001, t0 + start + len);
+      osc.connect(env).connect(out);
+      osc.start(t0 + start);
+      osc.stop(t0 + start + len + 0.05);
+    }
+  } catch {}
 }
 
 function removePeer(id) {

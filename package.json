@@ -1,7 +1,7 @@
 {
   "name": "twincast",
   "productName": "TwinCast",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "TwinCast: share your screen with friends in rooms, with per-app audio (no Discord leaking). Desktop client; the server is in server/.",
   "author": "xrissmark",
   "repository": {
