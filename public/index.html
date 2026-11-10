@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TwinCast</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Texts come from i18n.js (data-i18n* attributes); the English here is only a fallback. -->
+  <!-- ========== JOIN ========== -->
+  <main id="join" class="screen">
+    <form id="joinForm" class="card">
+      <div class="card-head">
+        <h1><span class="logo"></span> TwinCast</h1>
+        <select id="langSelect" class="lang-select" data-i18n-title="join.language" title="Language"></select>
+      </div>
+      <p class="muted" data-i18n="join.intro">Join a room. Anyone in the room can share their screen or watch.</p>
+      <label><span data-i18n="join.name">Your name</span> <input id="nameInput" required maxlength="32" autocomplete="nickname"></label>
+      <label><span data-i18n="join.room">Room</span> <input id="roomInput" required maxlength="64" data-i18n-placeholder="join.roomPlaceholder" placeholder="e.g. game-night"></label>
+      <div id="desktopServer" hidden>
+        <label><span data-i18n="join.server">Server address</span>
+          <span class="server-row">
+            <input id="serverInput" data-i18n-placeholder="join.serverPlaceholder" placeholder="https://twincast.example.com or http://[2804:…]:8080" autocomplete="url">
+            <button type="button" id="testBtn" class="secondary"><span class="ico" data-icon="test"></span><span data-i18n="join.test">Test connection</span></button>
+          </span>
+        </label>
+        <p id="testResult" class="test-result small" hidden></p>
+      </div>
+      <button type="submit" class="primary"><span class="ico" data-icon="join"></span><span data-i18n="join.submit">Join room</span></button>
+      <p id="joinError" class="error"></p>
+    </form>
+  </main>
+
+  <!-- ========== ROOM ========== -->
+  <main id="room" class="screen" hidden>
+    <header class="topbar">
+      <div class="room-title"><span class="logo"></span> <strong id="roomName"></strong></div>
+      <div class="top-actions">
+        <button id="copyLinkBtn" class="secondary"><span class="ico" data-icon="link"></span><span data-i18n="room.copyInvite">Copy invite link</span></button>
+        <button id="leaveBtn" class="ghost"><span class="ico" data-icon="leave"></span><span data-i18n="room.leave">Leave</span></button>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="stage-wrap">
+        <!-- Your own share, while its preview is hidden: a slim bar above the streams -->
+        <div id="localBar" class="local-bar"></div>
+        <div id="stage" class="stage">
+          <div id="emptyStage" class="empty">
+            <p data-i18n="room.emptyTitle">Nobody is sharing yet.</p>
+            <p class="muted" data-i18n-html="room.emptyHint">Click <b>Share screen</b> to start, or wait for a friend to share.</p>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="shareBtn" class="primary"><span class="ico" data-icon="share"></span><span class="lbl" data-i18n="room.share">Share screen</span></button>
+          <button id="changeBtn" class="secondary" hidden data-i18n-title="room.changeTitle" title="Pick another window or screen without stopping"><span class="ico" data-icon="change"></span><span data-i18n="room.change">Change screen</span></button>
+          <button id="stopBtn" class="danger" hidden><span class="ico" data-icon="stop"></span><span data-i18n="room.stop">Stop sharing</span></button>
+          <button id="previewBtn" class="secondary" hidden data-i18n-title="room.previewTitle" title="Your friends still see your screen; this only hides your own copy"><span class="ico" data-icon="eyeOff"></span><span class="lbl">Hide my preview</span></button>
+          <span id="audioStatus" class="muted small"></span>
+          <!-- Sharer only: annotations switch, and (while on) the broom = clear all marks -->
+          <div id="annControls" class="ann-controls" hidden>
+            <button id="annClearBtn" class="icon-btn" data-i18n-title="ann.clearAllTitle" title="Clear all marks"><span class="ico" data-icon="broom"></span></button>
+            <label class="switch" data-i18n-title="ann.allowTitle" title="Let people watching draw on your screen">
+              <span class="ico" data-icon="pencil"></span>
+              <input type="checkbox" id="annToggle" role="switch">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <h3><span data-i18n="room.people">People</span> <span id="peopleCount" class="badge">1</span></h3>
+        <ul id="peopleList" class="people"></ul>
+        <h3 data-i18n="room.chat">Chat</h3>
+        <div id="chatLog" class="chat-log"></div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" maxlength="500" data-i18n-placeholder="room.chatPlaceholder" placeholder="Say something…" autocomplete="off">
+        </form>
+      </aside>
+    </section>
+  </main>
+
+  <!-- ========== SCREEN SHARE POPUP ========== -->
+  <!-- Main view: summary of what you stream, the sound and the quality. Clicking a field
+       opens its selector view. Browsers only see the quality part. -->
+  <dialog id="picker">
+    <form method="dialog" class="picker">
+      <div id="pickMain" class="pick-view">
+        <h2 class="pick-title" data-i18n="pick.title">Screen Share</h2>
+
+        <div id="pickSourceSection" class="pick-section">
+          <div class="pick-label" data-i18n="pick.streaming">What you're streaming</div>
+          <button type="button" id="pickSourceField" class="pick-field">
+            <span id="pickSourceIcon" class="pick-icon"></span>
+            <span id="pickSourceName" class="pick-field-text"></span>
+            <span class="pick-change" data-i18n="pick.change">Change</span>
+          </button>
+        </div>
+        <p id="pickBrowserNote" class="muted small" data-i18n="pick.browserNote" hidden></p>
+
+        <div id="pickAudioRow" class="pick-section">
+          <label class="pick-check"><input type="checkbox" id="pickAudioOn"> <span id="pickAudioLabel"></span></label>
+          <p id="pickAudioNote" class="muted small pick-note" data-i18n="picker.windowSoundNote">Browsers send the sound of all their tabs.</p>
+        </div>
+
+        <div id="pickSoundSection" class="pick-section">
+          <div class="pick-label" data-i18n="pick.soundConfig">Sound configuration</div>
+          <button type="button" id="pickSoundField" class="pick-field">
+            <span id="pickSoundIcon" class="pick-icon"></span>
+            <span id="pickSoundName" class="pick-field-text"></span>
+            <span class="pick-change" data-i18n="pick.change">Change</span>
+          </button>
+        </div>
+
+        <div class="pick-section">
+          <div class="pick-label" data-i18n="pick.quality">Stream quality</div>
+          <div class="pick-quality">
+            <div>
+              <div class="pick-sublabel" data-i18n="pick.resolution">Resolution</div>
+              <div id="resSeg" class="seg">
+                <button type="button" data-res="720">720</button>
+                <button type="button" data-res="1080">1080</button>
+                <button type="button" data-res="1440">1440</button>
+                <button type="button" data-res="source" data-i18n="pick.source">Source</button>
+              </div>
+            </div>
+            <div>
+              <div class="pick-sublabel" data-i18n="pick.frameRate">Frame rate</div>
+              <div id="fpsSeg" class="seg">
+                <button type="button" data-fps="15">15</button>
+                <button type="button" data-fps="30">30</button>
+                <button type="button" data-fps="60">60</button>
+              </div>
+            </div>
+          </div>
+          <p id="pickEstimate" class="muted small pick-note"></p>
+        </div>
+
+        <div class="picker-actions">
+          <button value="cancel" class="ghost" data-i18n="picker.cancel">Cancel</button>
+          <button id="pickerShare" value="share" class="primary"><span class="ico" data-icon="live"></span><span class="lbl">Go Live</span></button>
+        </div>
+      </div>
+
+      <div id="pickSourceView" class="pick-view" hidden>
+        <div class="pick-head">
+          <button type="button" class="ghost pick-back" data-i18n-title="pick.back" title="Back">←</button>
+          <h2 data-i18n="picker.title">What do you want to share?</h2>
+        </div>
+        <div class="tabs">
+          <button type="button" data-tab="window" class="tab active" data-i18n="picker.windows">Windows</button>
+          <button type="button" data-tab="screen" class="tab" data-i18n="picker.screen">Entire screen</button>
+        </div>
+        <div id="sourceGrid" class="source-grid"></div>
+      </div>
+
+      <div id="pickSoundView" class="pick-view" hidden>
+        <div class="pick-head">
+          <button type="button" class="ghost pick-back" data-i18n-title="pick.back" title="Back">←</button>
+          <h2 data-i18n="pick.soundConfig">Sound configuration</h2>
+        </div>
+        <div id="soundModes" class="seg sound-modes" role="group">
+          <button type="button" data-mode="all" data-i18n="picker.modeAll">Share all</button>
+          <button type="button" data-mode="allBut" data-i18n="picker.modeAllBut">All but Discord</button>
+          <button type="button" data-mode="advanced" data-i18n="picker.modeAdvanced">Advanced</button>
+        </div>
+        <p id="soundHint" class="muted small"></p>
+        <div id="audioApps" class="audio-apps"></div>
+        <div class="picker-actions">
+          <button type="button" class="primary pick-back" data-i18n="pick.done">Done</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="i18n.js"></script>
+  <script src="annotate.js"></script>
+  <script src="app.js"></script>
+  <script src="annotate-ui.js"></script>
+</body>
+</html>

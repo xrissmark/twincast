@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TwinCast marks</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <!-- Transparent, click-through window over the screen/window being shared.
+       It shows viewers' marks to the sharer and is hidden from screen capture. -->
+  <canvas id="marks"></canvas>
+  <script src="annotate.js"></script>
+  <script>
+    'use strict';
+    const board = new Annot.Board();
+    const canvas = document.getElementById('marks');
+    let raf = 0;
+    function draw() {
+      raf = 0;
+      const ctx = Annot.fitCanvas(canvas);
+      const animating = Annot.render(ctx, board, { x: 0, y: 0, w: canvas.clientWidth, h: canvas.clientHeight });
+      if (animating) redraw();
+    }
+    function redraw() { if (!raf) raf = requestAnimationFrame(draw); }
+    window.desktop.onOverlayMsg((m) => { board.apply(m); redraw(); });
+    window.addEventListener('resize', redraw);
+  </script>
+</body>
+</html>

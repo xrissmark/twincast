@@ -1,0 +1,16 @@
+{
+  "name": "twincast-server",
+  "version": "2.0.0",
+  "description": "TwinCast room server: signaling, web client and admin dashboard",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

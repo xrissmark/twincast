@@ -1,0 +1,24 @@
+{
+  "name": "twincast",
+  "productName": "TwinCast",
+  "version": "2.0.0",
+  "description": "TwinCast: share your screen with friends in rooms, with per-app audio (no Discord leaking). Desktop client; the server is in server/.",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "server": "node server/server.js",
+    "app": "electron .",
+    "build:app": "node scripts/build-app.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "build": "npm run build:server && npm run build:app",
+    "build:native": "native\build.bat",
+    "test": "node test/signaling.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^45.2.0"
+  }
+}

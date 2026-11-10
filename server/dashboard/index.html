@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>TwinCast Server</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <!-- ========== LOGIN ========== -->
+  <main id="login" class="login" hidden>
+    <form id="loginForm" class="card">
+      <h1><span class="logo"></span> TwinCast Server</h1>
+      <p class="muted">Enter the dashboard password. It's in <code>admin-password.txt</code> next to <code>server.js</code>, or the <code>ADMIN_PASSWORD</code> setting.</p>
+      <label>Password <input id="pwInput" type="password" required autocomplete="current-password"></label>
+      <label class="check"><input id="rememberInput" type="checkbox" checked> Remember on this browser</label>
+      <button class="primary" type="submit">Open dashboard</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </main>
+
+  <!-- ========== DASHBOARD ========== -->
+  <main id="dash" hidden>
+    <header class="topbar">
+      <div><span class="logo"></span> <strong>TwinCast Server</strong> <span id="version" class="muted small"></span></div>
+      <div class="top-right">
+        <span id="live" class="live-pill"><span class="dot"></span> <span id="liveText">Live</span></span>
+        <button id="logoutBtn" class="ghost">Log out</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <div class="stat"><div class="label">People online</div><div id="sUsers" class="value">–</div><div id="sUsersSub" class="sub"></div></div>
+      <div class="stat"><div class="label">Rooms open</div><div id="sRooms" class="value">–</div><div id="sRoomsSub" class="sub"></div></div>
+      <div class="stat"><div class="label">Sharing now</div><div id="sSharing" class="value">–</div><div class="sub">screens being shared</div></div>
+      <div class="stat"><div class="label">Peak people</div><div id="sPeak" class="value">–</div><div id="sPeakSub" class="sub"></div></div>
+      <div class="stat"><div class="label">Uptime</div><div id="sUptime" class="value">–</div><div id="sUptimeSub" class="sub"></div></div>
+      <div class="stat"><div class="label">Server load</div><div id="sCpu" class="value">–</div><div id="sMem" class="sub"></div></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel rooms-panel">
+        <div class="panel-head">
+          <h2>Rooms</h2>
+          <input id="filterInput" type="search" placeholder="Filter rooms or people…" aria-label="Filter rooms or people">
+        </div>
+        <div id="rooms" class="rooms"></div>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>Recent activity</h2>
+          <ol id="events" class="events"></ol>
+        </div>
+        <div class="panel">
+          <h2>Since start</h2>
+          <dl id="totals" class="kv"></dl>
+        </div>
+        <div class="panel">
+          <h2>Server</h2>
+          <dl id="serverInfo" class="kv"></dl>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
